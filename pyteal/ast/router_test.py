@@ -150,11 +150,6 @@ def not_registrable(lhs: pt.abi.Uint64, rhs: pt.Expr, *, output: pt.abi.Uint64):
     return output.set(lhs.get() * rhs)
 
 
-@pt.ABIReturnSubroutine
-def txn_type(t: pt.abi.Transaction, *, output: pt.abi.Uint64):
-    return output.set(t.get().amount())
-
-
 GOOD_SUBROUTINE_CASES: list[pt.ABIReturnSubroutine | pt.SubroutineFnWrapper] = [
     add,
     sub,
@@ -169,7 +164,6 @@ GOOD_SUBROUTINE_CASES: list[pt.ABIReturnSubroutine | pt.SubroutineFnWrapper] = [
     dummy_doing_nothing,
     eine_constant,
     take_abi_and_log,
-    # txn_type,
 ]
 
 ON_COMPLETE_CASES: list[pt.EnumInt] = [
@@ -271,15 +265,8 @@ def test_call_config():
 def test_method_config():
     never_mc = pt.MethodConfig(no_op=pt.CallConfig.NEVER)
     assert never_mc.is_never()
-    assert not never_mc.is_arc4_compliant()
     assert never_mc.approval_cond() == 0
     assert never_mc.clear_state_cond() == 0
-
-    all_mc = pt.MethodConfig.arc4_compliant()
-    assert not all_mc.is_never()
-    assert all_mc.is_arc4_compliant()
-    assert all_mc.approval_cond() == 1
-    assert all_mc.clear_state_cond() == 1
 
     on_complete_pow_set = power_set(ON_COMPLETE_CASES)
     approval_check_names_n_ocs = [
@@ -315,7 +302,7 @@ def test_method_config():
             ):
                 assert mc.approval_cond() == 0
                 continue
-            elif mc.is_arc4_compliant() or all(
+            elif all(
                 getattr(mc, i) == pt.CallConfig.ALL
                 for i, _ in approval_check_names_n_ocs
             ):
@@ -426,7 +413,7 @@ def test_wrap_handler_method_call():
     )
     for abi_subroutine in ONLY_ABI_SUBROUTINE_CASES:
         wrapped: pt.Expr = ASTBuilder.wrap_handler(True, abi_subroutine)
-        assembled_wrapped: pt.TealBlock = assemble_helper(wrapped)
+        actual: pt.TealBlock = assemble_helper(wrapped)
 
         args: list[pt.abi.BaseType] = [
             spec.new_instance()
@@ -474,9 +461,60 @@ def test_wrap_handler_method_call():
         else:
             evaluate = abi_subroutine(*args)
 
-        actual = assemble_helper(pt.Seq(*loading, evaluate, pt.Approve()))
+        expected = assemble_helper(pt.Seq(*loading, evaluate, pt.Approve()))
         with pt.TealComponent.Context.ignoreScratchSlotEquality(), pt.TealComponent.Context.ignoreExprEquality():
-            assert actual == assembled_wrapped
+            assert actual == expected
+
+        assert pt.TealBlock.MatchScratchSlotReferences(
+            pt.TealBlock.GetReferencedScratchSlots(actual),
+            pt.TealBlock.GetReferencedScratchSlots(expected),
+        )
+
+
+def test_wrap_handler_method_call_many_args():
+    wrapped: pt.Expr = ASTBuilder.wrap_handler(True, many_args)
+    actual: pt.TealBlock = assemble_helper(wrapped)
+
+    args = [pt.abi.Uint64() for _ in range(20)]
+    last_arg = pt.abi.TupleTypeSpec(
+        *[pt.abi.Uint64TypeSpec() for _ in range(6)]
+    ).new_instance()
+
+    output_temp = pt.abi.Uint64()
+    expected_ast = pt.Seq(
+        args[0].decode(pt.Txn.application_args[1]),
+        args[1].decode(pt.Txn.application_args[2]),
+        args[2].decode(pt.Txn.application_args[3]),
+        args[3].decode(pt.Txn.application_args[4]),
+        args[4].decode(pt.Txn.application_args[5]),
+        args[5].decode(pt.Txn.application_args[6]),
+        args[6].decode(pt.Txn.application_args[7]),
+        args[7].decode(pt.Txn.application_args[8]),
+        args[8].decode(pt.Txn.application_args[9]),
+        args[9].decode(pt.Txn.application_args[10]),
+        args[10].decode(pt.Txn.application_args[11]),
+        args[11].decode(pt.Txn.application_args[12]),
+        args[12].decode(pt.Txn.application_args[13]),
+        args[13].decode(pt.Txn.application_args[14]),
+        last_arg.decode(pt.Txn.application_args[15]),
+        last_arg[0].store_into(args[14]),
+        last_arg[1].store_into(args[15]),
+        last_arg[2].store_into(args[16]),
+        last_arg[3].store_into(args[17]),
+        last_arg[4].store_into(args[18]),
+        last_arg[5].store_into(args[19]),
+        many_args(*args).store_into(output_temp),
+        pt.abi.MethodReturn(output_temp),
+        pt.Approve(),
+    )
+    expected = assemble_helper(expected_ast)
+    with pt.TealComponent.Context.ignoreScratchSlotEquality(), pt.TealComponent.Context.ignoreExprEquality():
+        assert actual == expected
+
+    assert pt.TealBlock.MatchScratchSlotReferences(
+        pt.TealBlock.GetReferencedScratchSlots(actual),
+        pt.TealBlock.GetReferencedScratchSlots(expected),
+    )
 
 
 def test_contract_json_obj():
