@@ -131,12 +131,14 @@ def roundtrip_setup(abi_type):
     if isinstance(abi_type, tuple):
         abi_type, dynamic_length = abi_type
 
-    return (
-        abi_type,
-        str(abi.type_spec_from_annotation(abi_type)),
-        dynamic_length,
-        ABIRoundtrip(abi.make(abi_type), length=dynamic_length).pytealer(),
+    abi_type_str = str(abi.type_spec_from_annotation(abi_type))
+    roundtrip_or_msg = (
+        "ineligible for round trip test"
+        if abi_type_str in BAD_TYPES
+        else ABIRoundtrip(abi.make(abi_type), length=dynamic_length).pytealer()
     )
+
+    return (abi_type, abi_type_str, dynamic_length, roundtrip_or_msg)
 
 
 def test_abi_types_comprehensive():
