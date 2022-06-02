@@ -362,6 +362,18 @@ def make(t: type[T]) -> T:
 
 
 def algosdk_from_type_spec(t: TypeSpec) -> algosdk.abi.ABIType:
+    from pyteal.ast.abi import ReferenceTypeSpecs, TransactionTypeSpecs
+
+    if t in TransactionTypeSpecs:
+        raise TealInputError(
+            f"cannot map ABI transaction type spec {t!r} to an appropriate algosdk ABI type"
+        )
+
+    if t in ReferenceTypeSpecs:
+        raise TealInputError(
+            f"cannot map ABI reference type spec {t!r} to an appropriate algosdk ABI type"
+        )
+
     return algosdk.abi.ABIType.from_string(str(t))
 
 
