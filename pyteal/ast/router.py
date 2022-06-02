@@ -368,10 +368,9 @@ class ASTBuilder:
                     t.type_spec() for t in app_arg_vals[METHOD_ARG_NUM_CUTOFF - 1 :]
                 ]
                 app_arg_vals = app_arg_vals[: METHOD_ARG_NUM_CUTOFF - 1]
-                last_arg_spec = abi.TupleTypeSpec(
-                    *last_arg_specs_grouped
-                ).new_instance()
-                app_arg_vals.append(last_arg_spec)
+                app_arg_vals.append(
+                    abi.TupleTypeSpec(*last_arg_specs_grouped).new_instance()
+                )
 
             # decode app args
             decode_instructions: list[Expr] = [
@@ -391,14 +390,16 @@ class ASTBuilder:
 
                 decode_instructions += txn_decode_instructions
 
+            # de-tuplify into specific values using `store_into` on
+            # each element of the tuple'd arguements
             if tuplify:
-                tuple_abi_args: list[abi.BaseType] = arg_vals[
+                tupled_abi_vals: list[abi.BaseType] = arg_vals[
                     METHOD_ARG_NUM_CUTOFF - 1 :
                 ]
-                last_tuple_arg: abi.Tuple = cast(abi.Tuple, app_arg_vals[-1])
+                tupled_arg: abi.Tuple = cast(abi.Tuple, app_arg_vals[-1])
                 de_tuple_instructions: list[Expr] = [
-                    last_tuple_arg[idx].store_into(arg_val)
-                    for idx, arg_val in enumerate(tuple_abi_args)
+                    tupled_arg[idx].store_into(arg_val)
+                    for idx, arg_val in enumerate(tupled_abi_vals)
                 ]
                 decode_instructions += de_tuple_instructions
 
