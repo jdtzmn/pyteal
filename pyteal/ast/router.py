@@ -390,8 +390,8 @@ class ASTBuilder:
 
                 decode_instructions += txn_decode_instructions
 
-            # de-tuplify into specific values using `store_into` on
-            # each element of the tuple'd arguements
+            # de-tuple into specific values using `store_into` on
+            # each element of the tuple'd arguments
             if tuplify:
                 tupled_abi_vals: list[abi.BaseType] = arg_vals[
                     METHOD_ARG_NUM_CUTOFF - 1 :
